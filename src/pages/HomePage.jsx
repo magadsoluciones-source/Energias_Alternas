@@ -1,12 +1,11 @@
 // src/pages/HomePage.jsx
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { Header } from "../components/Header.jsx";
 import { Footer } from "../components/Footer.jsx";
 
-// Las piezas que separaste
-import Hero from "../components/home/hero.jsx";
+import Hero from "../components/home/Hero.jsx";
 import InfoSections from "../components/home/InfoSections.jsx";
-import Catalog from "../components/home/Catalog.jsx";
+import CatalogPreview from "../components/home/CatalogPreview.jsx"; // <-- Vista previa
 import { HowToChoose } from "../components/home/HowToChoose.jsx";
 import CTA from "../components/home/CTA.jsx";
 
@@ -22,19 +21,12 @@ export default function HomePage() {
     }
   };
 
-  useEffect(() => {
-    if (window.location.hash === "#catalogo") {
-      const el = document.getElementById("catalogo");
-      if (el) setTimeout(() => el.scrollIntoView({ behavior: "smooth" }), 100);
-    }
-  }, []);
-
   return (
     <>
       <Header />
       <Hero esSeñalado={esSeñalado} />
       <InfoSections alHacerClicVerPuntos={irAPuntosDePortada} />
-      <Catalog />
+      <CatalogPreview />
       <HowToChoose />
       <CTA />
       <Footer />

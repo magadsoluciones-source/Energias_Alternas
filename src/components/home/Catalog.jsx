@@ -25,7 +25,7 @@ function ProductCard({ product }) {
         !product.disponible ? "opacity-75" : ""
       }`}
     >
-      {/* Etiqueta flotante de Agotado en la esquina de la foto */}
+      {/* Etiqueta flotante de Agotado */}
       {!product.disponible && (
         <span className="absolute top-8 right-8 z-10 px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider bg-red-500 text-white shadow-md">
           Agotado
@@ -49,7 +49,7 @@ function ProductCard({ product }) {
       {product.disponible ? (
         <button
           onClick={(e) => {
-            e.preventDefault(); // evita navegar cuando dan clic aquí
+            e.preventDefault();
             addToCart({
               slug: product.id,
               name: product.nombre,
@@ -79,6 +79,9 @@ export default function Catalog() {
   const [loading, setLoading] = useState(true);
   const [categoryFilter, setCategoryFilter] = useState("todos");
   const [sort, setSort] = useState("sugerido");
+  
+  // Estado para el texto del buscador
+  const [searchQuery, setSearchQuery] = useState("");
 
   useEffect(() => {
     getProducts()
@@ -91,25 +94,32 @@ export default function Catalog() {
     return [...new Set(productos.map((p) => p.categoria))];
   }, [productos]);
 
-const filtered = useMemo(() => {
-    // 1. Filtrar por categoría primero
+  const filtered = useMemo(() => {
+    // 1. Filtrar por categoría
     let list =
       categoryFilter === "todos"
         ? [...productos]
         : productos.filter((p) => p.categoria === categoryFilter);
 
-    // 2. Ordenar aplicando la regla: Disponibles PRIMERO, Inactivos/Agotados AL FINAL
+    // 2. Filtrar por texto de búsqueda (nombre o descripción)
+    if (searchQuery.trim() !== "") {
+      const query = searchQuery.toLowerCase().trim();
+      list = list.filter(
+        (p) =>
+          p.nombre?.toLowerCase().includes(query) ||
+          p.descripcion?.toLowerCase().includes(query)
+      );
+    }
+
+    // 3. Ordenar: Disponibles PRIMERO, Agotados AL FINAL + Filtro de Precio
     return list.sort((a, b) => {
-      // Convertimos a booleano seguro (true/false)
       const aDisponible = Boolean(a.disponible);
       const bDisponible = Boolean(b.disponible);
 
-      // Regla de oro: Si la disponibilidad es distinta, el disponible va primero (-1)
       if (aDisponible !== bDisponible) {
         return aDisponible ? -1 : 1;
       }
 
-      // Si AMBOS están disponibles (o ambos agotados), aplicamos el criterio de orden seleccionado:
       if (sort === "asc") {
         return Number(a.precio_venta) - Number(b.precio_venta);
       }
@@ -117,10 +127,9 @@ const filtered = useMemo(() => {
         return Number(b.precio_venta) - Number(a.precio_venta);
       }
 
-      // "sugerido" (mantiene el orden original por defecto de la BD)
       return 0;
     });
-  }, [productos, categoryFilter, sort]);
+  }, [productos, categoryFilter, searchQuery, sort]);
 
   return (
     <section id="catalogo" className="max-w-6xl mx-auto px-6 py-20">
@@ -134,46 +143,91 @@ const filtered = useMemo(() => {
         </p>
       </div>
 
-      <div className="flex flex-wrap items-center justify-between gap-4 mb-8">
-        <div className="flex flex-wrap gap-2">
-          <button
-            onClick={() => setCategoryFilter("todos")}
-            className={
-              "px-4 py-2 rounded-full text-sm font-semibold border transition " +
-              (categoryFilter === "todos" ? "bg-ink text-white border-ink" : "border-black/15 text-black/70 hover:border-black/30")
-            }
+      {/* BARRA DE BÚSQUEDA Y FILTROS */}
+      <div className="space-y-4 mb-8">
+        
+        {/* Input de Buscador */}
+        <div className="relative max-w-md">
+          <input
+            type="text"
+            placeholder="Buscar por nombre o descripción..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="w-full bg-white border border-black/15 rounded-full py-2.5 pl-10 pr-10 text-sm focus:outline-none focus:border-black/40 transition-all shadow-sm"
+          />
+          {/* Lupa SVG */}
+          <svg
+            className="w-4 h-4 text-black/40 absolute left-3.5 top-1/2 -translate-y-1/2"
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
           >
-            Todos
-          </button>
-          {categories.map((c) => (
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+          </svg>
+
+          {/* Botón para limpiar texto de búsqueda */}
+          {searchQuery && (
             <button
-              key={c}
-              onClick={() => setCategoryFilter(c)}
-              className={
-                "px-4 py-2 rounded-full text-sm font-semibold border transition " +
-                (categoryFilter === c ? "bg-ink text-white border-ink" : "border-black/15 text-black/70 hover:border-black/30")
-              }
+              onClick={() => setSearchQuery("")}
+              className="absolute right-3.5 top-1/2 -translate-y-1/2 text-black/40 hover:text-black text-xs font-bold"
             >
-              {categoryLabels[c] || c}
+              ✕
             </button>
-          ))}
+          )}
         </div>
 
-        <select
-          value={sort}
-          onChange={(e) => setSort(e.target.value)}
-          className="px-4 py-2 rounded-full text-sm font-semibold border border-black/15 text-black/70 bg-white"
-        >
-          <option value="sugerido">Orden sugerido</option>
-          <option value="asc">Precio: menor a mayor</option>
-          <option value="desc">Precio: mayor a menor</option>
-        </select>
+        {/* Categorías y Orden */}
+        <div className="flex flex-wrap items-center justify-between gap-4">
+          <div className="flex flex-wrap gap-2">
+            <button
+              onClick={() => setCategoryFilter("todos")}
+              className={
+                "px-4 py-2 rounded-full text-sm font-semibold border transition " +
+                (categoryFilter === "todos" ? "bg-ink text-white border-ink" : "border-black/15 text-black/70 hover:border-black/30")
+              }
+            >
+              Todos
+            </button>
+            {categories.map((c) => (
+              <button
+                key={c}
+                onClick={() => setCategoryFilter(c)}
+                className={
+                  "px-4 py-2 rounded-full text-sm font-semibold border transition " +
+                  (categoryFilter === c ? "bg-ink text-white border-ink" : "border-black/15 text-black/70 hover:border-black/30")
+                }
+              >
+                {categoryLabels[c] || c}
+              </button>
+            ))}
+          </div>
+
+          <select
+            value={sort}
+            onChange={(e) => setSort(e.target.value)}
+            className="px-4 py-2 rounded-full text-sm font-semibold border border-black/15 text-black/70 bg-white cursor-pointer"
+          >
+            <option value="sugerido">Orden sugerido</option>
+            <option value="asc">Precio: menor a mayor</option>
+            <option value="desc">Precio: mayor a menor</option>
+          </select>
+        </div>
       </div>
 
       {loading ? (
         <p className="text-black/50 text-sm">Cargando productos...</p>
       ) : filtered.length === 0 ? (
-        <p className="text-black/50 text-sm">No hay productos en esta categoria por ahora.</p>
+        <div className="py-12 text-center bg-black/5 rounded-2xl">
+          <p className="text-black/60 text-sm font-medium">No se encontraron productos que coincidan con tu búsqueda.</p>
+          {searchQuery && (
+            <button
+              onClick={() => setSearchQuery("")}
+              className="mt-3 text-xs font-bold text-teal hover:underline"
+            >
+              Limpiar filtro de búsqueda
+            </button>
+          )}
+        </div>
       ) : (
         <div className="grid md:grid-cols-3 gap-6">
           {filtered.map((p) => (
