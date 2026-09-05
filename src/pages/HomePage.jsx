@@ -3,7 +3,7 @@ import { useState } from "react";
 import { Header } from "../components/Header.jsx";
 import { Footer } from "../components/Footer.jsx";
 
-import Hero from "../components/home/Hero.jsx";
+import Hero from "../components/home/hero.jsx";
 import InfoSections from "../components/home/InfoSections.jsx";
 import CatalogPreview from "../components/home/CatalogPreview.jsx"; // <-- Vista previa
 import { HowToChoose } from "../components/home/HowToChoose.jsx";
