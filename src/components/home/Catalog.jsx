@@ -1,5 +1,6 @@
 // src/components/home/Catalog.jsx
-import { useMemo, useState, useEffect } from "react";
+// src/components/home/Catalog.jsx
+import { useMemo, useState, useEffect, useRef, useCallback } from "react";
 import { Link } from "react-router-dom";
 import { useCart } from "../../cart/Cart.jsx"; 
 import { getProducts } from "../../services/productsService.js";
@@ -14,62 +15,178 @@ function formatPrice(precio) {
   return `Q${Number(precio).toLocaleString("es-GT")}`;
 }
 
-function ProductCard({ product }) {
+function calcularEscalaOptima(img, targetFillRatio = 1.0) {
+  try {
+    const canvas = document.createElement("canvas");
+    const w = img.naturalWidth;
+    const h = img.naturalHeight;
+    canvas.width = w;
+    canvas.height = h;
+
+    const ctx = canvas.getContext("2d", { willReadFrequently: true });
+    ctx.drawImage(img, 0, 0, w, h);
+
+    const { data } = ctx.getImageData(0, 0, w, h);
+    let minX = w, minY = h, maxX = 0, maxY = 0;
+    let found = false;
+
+    const step = 2;
+    for (let y = 0; y < h; y += step) {
+      for (let x = 0; x < w; x += step) {
+        const idx = (y * w + x) * 4;
+        const alpha = data[idx + 3];
+        const r = data[idx], g = data[idx + 1], b = data[idx + 2];
+        const isWhite = r > 245 && g > 245 && b > 245;
+
+        if (alpha > 15 && !isWhite) {
+          found = true;
+          if (x < minX) minX = x;
+          if (x > maxX) maxX = x;
+          if (y < minY) minY = y;
+          if (y > maxY) maxY = y;
+        }
+      }
+    }
+
+    if (!found) {
+      console.warn("No se detectó contenido en la imagen, usando escala 1");
+      return 1;
+    }
+
+    const contentWidth = maxX - minX;
+    const contentHeight = maxY - minY;
+    const fillRatio = Math.max(contentWidth / w, contentHeight / h);
+
+    if (fillRatio <= 0) return 1;
+
+    const scale = targetFillRatio / fillRatio;
+    console.log(`fillRatio: ${fillRatio.toFixed(2)}, scale calculado: ${scale.toFixed(2)}`);
+
+    // Techo subido de 1.6 a 3 — antes se recortaba silenciosamente acá
+    return Math.min(Math.max(scale, 0.7), 3);
+  } catch (err) {
+    console.warn("⚠️ FALLÓ el cálculo (probable CORS):", err);
+    return 1;
+  }
+}
+
+export function ProductCard({ product }) {
   const { addToCart } = useCart();
-  const imagen = product.imagenes?.[0];
+  const imagenes = product.imagenes || [];
+
+  // Productos donde la SEGUNDA imagen (índice 1) debe mostrarse como principal
+  const productosImagenInvertida = [
+    "BLUETTI EB55",
+    "BLUETTI AC200PL",
+    "BLUETTI AC180P",
+    "BLUETTI AC500+2 B300K",
+  ];
+
+  const usarImagenInvertida = productosImagenInvertida.some((nombre) =>
+    product.nombre?.toUpperCase().includes(nombre)
+  );
+
+  const imagenPrincipal =
+    usarImagenInvertida && imagenes.length > 1 ? imagenes[1] : imagenes[0];
+
+  const [imgScale, setImgScale] = useState(1);
+  const scaleCache = useRef({});
+
+  const handleImageLoad = useCallback((e) => {
+    const src = e.target.src;
+    if (scaleCache.current[src] !== undefined) {
+      setImgScale(scaleCache.current[src]);
+      return;
+    }
+    const scale = calcularEscalaOptima(e.target);
+    scaleCache.current[src] = scale;
+    setImgScale(scale);
+  }, []);
 
   return (
     <Link
       to={`/producto/${product.id}`}
-      className={`card-lift bg-white rounded-2xl p-6 border border-black/5 relative block transition-all ${
-        !product.disponible ? "opacity-75" : ""
-      }`}
+      className="group relative p-4 rounded-3xl bg-white shadow-sm hover:shadow-lg hover:-translate-y-1 hover:border-black/15 border border-black/5 transition-all duration-300 ease-out flex flex-col justify-between"
     >
-      {/* Etiqueta flotante de Agotado */}
-      {!product.disponible && (
-        <span className="absolute top-8 right-8 z-10 px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider bg-red-500 text-white shadow-md">
-          Agotado
-        </span>
-      )}
+      <div>
+        <div className="w-full h-56 mb-2 flex items-center justify-center p-2 relative overflow-hidden">
+          <div className="absolute top-2 left-2 z-10">
+            {!product.disponible ? (
+              <span className="text-[10px] font-bold uppercase tracking-wider text-red-600 bg-red-100/90 border border-red-200 px-2.5 py-1 rounded-xl shadow-xs">
+                Agotado
+              </span>
+            ) : (
+              <div className="inline-flex items-center gap-1.5 text-xs font-bold text-white bg-neutral-900/95 backdrop-blur-sm px-3.5 py-1.5 rounded-xl shadow-sm border border-white/10">
+  
+  <span className="tracking-wide">10 años de garantía</span>
+</div>
+            )}
+          </div>
 
-      <div className="w-full h-40 rounded-xl mb-5 overflow-hidden bg-black/5 relative">
-        {imagen ? (
-          <img src={imagen} alt={product.nombre} className="w-full h-full object-cover" />
+          {imagenPrincipal ? (
+            <img
+              src={imagenPrincipal}
+              alt={product.nombre}
+              crossOrigin="anonymous"
+              onLoad={handleImageLoad}
+              onError={(e) => {
+                e.target.onerror = null;
+                e.target.style.display = "none";
+              }}
+              style={{ transform: `scale(${imgScale})` }}
+              className="max-h-full max-w-full object-contain filter drop-shadow-md transition-transform duration-200 ease-out group-hover:scale-105"
+            />
+          ) : (
+            <div className="text-4xl">☀️</div>
+          )}
+        </div>
+
+        <div className="space-y-0.5 px-1">
+          <p className="text-[10px] font-semibold tracking-widest text-black/40 uppercase">
+            {categoryLabels[product.categoria] || "Energía Solar"}
+          </p>
+          <h3 className="text-sm font-bold text-gray-900 leading-snug group-hover:text-teal-700 transition-colors line-clamp-2">
+            {product.nombre}
+          </h3>
+        </div>
+      </div>
+
+      <div className="pt-3 mt-3 px-1 border-t border-black/10 flex items-center justify-between gap-2">
+        <div className="flex flex-col">
+          <span className="text-[9px] font-medium text-black/40 uppercase tracking-wider">Precio</span>
+          <span className="text-lg font-black text-black leading-tight">
+            {formatPrice(product.precio_venta)}
+          </span>
+        </div>
+
+        {product.disponible ? (
+          <button
+            onClick={(e) => {
+              e.preventDefault();
+              addToCart({
+                slug: product.id,
+                name: product.nombre,
+                price: formatPrice(product.precio_venta),
+                imagen_url: imagenPrincipal,
+              });
+            }}
+            className="px-4 py-2 rounded-full bg-black text-white text-xs font-semibold hover:bg-teal-600 transition-all duration-200 active:scale-95 shadow-sm flex items-center gap-1.5 cursor-pointer"
+          >
+            <span>Agregar</span>
+            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v16m8-8H4" />
+            </svg>
+          </button>
         ) : (
-          <div className="w-full h-full flex items-center justify-center text-4xl">☀️</div>
+          <button
+            disabled
+            onClick={(e) => e.preventDefault()}
+            className="px-4 py-2 rounded-full bg-black/5 text-black/30 text-xs font-semibold cursor-not-allowed"
+          >
+            Agotado
+          </button>
         )}
       </div>
-
-      <h3 className="text-lg font-bold mb-2">{product.nombre}</h3>
-      <div className="flex items-center justify-between mb-3">
-        <span className="font-bold">{formatPrice(product.precio_venta)}</span>
-      </div>
-
-      {/* Botón condicional según la disponibilidad */}
-      {product.disponible ? (
-        <button
-          onClick={(e) => {
-            e.preventDefault();
-            addToCart({
-              slug: product.id,
-              name: product.nombre,
-              price: formatPrice(product.precio_venta),
-              imagen_url: imagen,
-            });
-          }}
-          className="w-full py-2.5 rounded-full border border-black/15 text-sm font-semibold hover:bg-ink hover:text-white hover:border-ink transition-colors cursor-pointer"
-        >
-          Agregar al carrito
-        </button>
-      ) : (
-        <button
-          disabled
-          onClick={(e) => e.preventDefault()}
-          className="w-full py-2.5 rounded-full bg-slate-100 border border-slate-200 text-slate-400 text-sm font-semibold cursor-not-allowed"
-        >
-          No disponible
-        </button>
-      )}
     </Link>
   );
 }

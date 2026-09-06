@@ -79,10 +79,10 @@ export default function Hero({ esSeñalado }) {
         <div className="relative z-10 w-full h-full flex flex-col pl-2 pr-4 md:pl-4 md:pr-10 pt-20 md:pt-28 pb-10 md:pb-16 min-h-[480px] md:min-h-[600px] justify-center pointer-events-none">
           <div className="max-w-[260px] sm:max-w-xs md:max-w-md pointer-events-none text-left">
             <p className="uppercase tracking-[0.15em] text-[10px] sm:text-xs font-semibold mb-3 text-gold">
-              Energia que no depende de nadie
+              Energía que no depende de nadie
             </p>
             <h1 className="text-2xl sm:text-3xl md:text-6xl font-bold leading-[1.15] mb-3 md:mb-6 text-white display">
-              Independencia <span className="text-gold">energetica,</span>
+              Independencia <span className="text-gold">energética,</span>
               <br />
               lista para instalar.
             </h1>
